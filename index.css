@@ -1,0 +1,361 @@
+import { useMemo, useState } from "react";
+import {
+  MapPin,
+  Trash2,
+  ExternalLink,
+  Plus,
+  Pencil,
+  X,
+  Check,
+  Coffee,
+  ShoppingBag,
+  Landmark,
+  Trees,
+  Building,
+  GripVertical,
+} from "lucide-react";
+import { Place, PlaceCategory, PlaceSubType } from "@/lib/types";
+import { SectionHeader } from "@/components/SectionHeader";
+import { IconButton } from "@/components/IconButton";
+import { EmptyState } from "@/components/EmptyState";
+
+interface PlacesTabProps {
+  items: Place[];
+  add: (payload: {
+    name: string;
+    notes: string;
+    link: string;
+    region: string;
+    category: PlaceCategory;
+    sub_type: PlaceSubType;
+  }) => void;
+  update: (id: string, patch: Partial<Place>) => void;
+  remove: (id: string) => void;
+}
+
+const CATEGORIES: PlaceCategory[] = ["Kuala Lumpur", "Ipoh/Malacca(Melaka)", "Others"];
+const SUB_TYPES: { key: PlaceSubType; icon: typeof Coffee }[] = [
+  { key: "Cafes", icon: Coffee },
+  { key: "Malls", icon: ShoppingBag },
+  { key: "Attractions", icon: Landmark },
+  { key: "Parks", icon: Trees },
+  { key: "Hotels", icon: Building },
+  { key: "Others", icon: MapPin },
+];
+
+const CATEGORY_SHORT: Record<PlaceCategory, string> = {
+  "Kuala Lumpur": "KL",
+  "Ipoh/Malacca(Melaka)": "Ipoh/Melaka",
+  Others: "Others",
+};
+
+interface PlaceCardProps {
+  place: Place;
+  onRemove: (id: string) => void;
+  onUpdate: (id: string, patch: Partial<Place>) => void;
+  onDragStart: (e: React.DragEvent, place: Place) => void;
+  onDragEnd: () => void;
+  isDragging: boolean;
+}
+
+function PlaceCard({
+  place,
+  onRemove,
+  onUpdate,
+  onDragStart,
+  onDragEnd,
+  isDragging,
+}: PlaceCardProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({
+    name: place.name,
+    notes: place.notes,
+    link: place.link,
+    sub_type: place.sub_type,
+  });
+
+  if (editing) {
+    return (
+      <div className="bg-white border border-jade/50 rounded-xl px-3 py-3 space-y-2 animate-fade-in-up">
+        <input
+          value={draft.name}
+          onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+          placeholder="Place name"
+          className="w-full rounded-lg border border-sand-deep bg-white px-2.5 py-2 text-[14px] outline-none focus:ring-2 focus:ring-jade/40"
+        />
+        <div className="flex gap-1 flex-wrap">
+          {SUB_TYPES.map((st) => {
+            const Icon = st.icon;
+            return (
+              <button
+                key={st.key}
+                onClick={() => setDraft({ ...draft, sub_type: st.key })}
+                className={`flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[12px] font-medium transition ${
+                  draft.sub_type === st.key
+                    ? "bg-jade text-white"
+                    : "bg-cream-tint/60 text-bark border border-sand"
+                }`}
+              >
+                <Icon size={11} />
+                {st.key}
+              </button>
+            );
+          })}
+        </div>
+        <input
+          value={draft.notes}
+          onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
+          placeholder="Notes (optional)"
+          className="w-full rounded-lg border border-sand-deep bg-white px-2.5 py-2 text-[14px] outline-none focus:ring-2 focus:ring-jade/40"
+        />
+        <input
+          value={draft.link}
+          onChange={(e) => setDraft({ ...draft, link: e.target.value })}
+          placeholder="Link (optional)"
+          className="w-full rounded-lg border border-sand-deep bg-white px-2.5 py-2 text-[14px] outline-none focus:ring-2 focus:ring-jade/40"
+        />
+        <div className="flex gap-2 justify-end pt-1">
+          <button
+            onClick={() => {
+              setDraft({
+                name: place.name,
+                notes: place.notes,
+                link: place.link,
+                sub_type: place.sub_type,
+              });
+              setEditing(false);
+            }}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[13px] text-bark border border-sand-deep active:scale-95 transition"
+          >
+            <X size={14} /> Cancel
+          </button>
+          <button
+            onClick={() => {
+              onUpdate(place.id, draft);
+              setEditing(false);
+            }}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[13px] bg-forest text-white active:scale-95 transition hover:bg-forest/90"
+          >
+            <Check size={14} /> Save
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      draggable
+      onDragStart={(e) => onDragStart(e, place)}
+      onDragEnd={onDragEnd}
+      className={`bg-white/70 border rounded-xl px-2.5 py-2.5 transition hover:border-jade/40 animate-fade-in-up ${
+        isDragging ? "opacity-40 border-jade border-dashed" : "border-sand"
+      }`}
+    >
+      <div className="flex items-start gap-1.5">
+        <div className="flex items-center pt-0.5 text-muted/60 cursor-grab active:cursor-grabbing">
+          <GripVertical size={14} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[14px] font-medium text-ink flex items-center gap-1.5">
+            <MapPin size={12} className="text-spice flex-shrink-0" />
+            {place.name}
+          </div>
+          <div className="text-[11px] text-jade mt-0.5 pl-[20px] font-medium">{place.sub_type}</div>
+          {place.notes && (
+            <div className="text-[12px] text-ink-soft mt-0.5 pl-[20px]">{place.notes}</div>
+          )}
+          {place.link && (
+            <a
+              href={place.link}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-[12px] text-jade mt-1 pl-[20px] hover:underline"
+            >
+              Open link <ExternalLink size={10} />
+            </a>
+          )}
+        </div>
+        <div className="flex items-center gap-0.5">
+          <IconButton onClick={() => setEditing(true)} label="Edit place">
+            <Pencil size={14} />
+          </IconButton>
+          <IconButton onClick={() => onRemove(place.id)} label="Remove place" tone="danger">
+            <Trash2 size={14} />
+          </IconButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function PlacesTab({ items, add, update, remove }: PlacesTabProps) {
+  const [activeCategory, setActiveCategory] = useState<PlaceCategory>("Kuala Lumpur");
+  const [activeSubType, setActiveSubType] = useState<PlaceSubType>("Attractions");
+  const [form, setForm] = useState({ name: "", notes: "", link: "" });
+  const [draggedPlace, setDraggedPlace] = useState<Place | null>(null);
+  const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
+
+  const filtered = useMemo(
+    () =>
+      items.filter(
+        (p) => p.category === activeCategory && p.sub_type === activeSubType
+      ),
+    [items, activeCategory, activeSubType]
+  );
+
+  const counts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const p of items) {
+      if (p.category === activeCategory) {
+        const key = `${p.category}:${p.sub_type}`;
+        map[key] = (map[key] || 0) + 1;
+      }
+    }
+    return map;
+  }, [items, activeCategory]);
+
+  const handleAdd = () => {
+    if (!form.name.trim()) return;
+    add({
+      ...form,
+      region: activeCategory,
+      category: activeCategory,
+      sub_type: activeSubType,
+    });
+    setForm({ name: "", notes: "", link: "" });
+  };
+
+  const handleDropOnSubType = (cat: PlaceCategory, sub: PlaceSubType) => {
+    if (draggedPlace) {
+      update(draggedPlace.id, { category: cat, sub_type: sub, region: cat });
+    }
+    setDraggedPlace(null);
+    setDragOverTarget(null);
+  };
+
+  return (
+    <div>
+      <SectionHeader eyebrow="Want to go · drag to move" title="Places" />
+
+      {/* Category tabs */}
+      <div className="flex gap-2 mb-3">
+        {CATEGORIES.map((cat) => {
+          const total = items.filter((p) => p.category === cat).length;
+          return (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              className={`flex-1 rounded-xl px-3 py-2.5 text-[13px] font-medium transition ${
+                activeCategory === cat
+                  ? "bg-forest text-white shadow-sm"
+                  : "bg-white/70 text-bark border border-sand hover:border-jade/50"
+              }`}
+            >
+              {CATEGORY_SHORT[cat]}
+              {total > 0 && (
+                <span className={`ml-1.5 text-[11px] ${activeCategory === cat ? "text-mint" : "text-muted"}`}>
+                  {total}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Sub-type chips (drop targets) */}
+      <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1 mb-4">
+        {SUB_TYPES.map((st) => {
+          const Icon = st.icon;
+          const isActive = activeSubType === st.key;
+          const count = counts[`${activeCategory}:${st.key}`] || 0;
+          const dropKey = `${activeCategory}:${st.key}`;
+          return (
+            <button
+              key={st.key}
+              onClick={() => setActiveSubType(st.key)}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOverTarget(dropKey);
+              }}
+              onDragLeave={() => setDragOverTarget(null)}
+              onDrop={(e) => {
+                e.preventDefault();
+                handleDropOnSubType(activeCategory, st.key);
+              }}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-medium whitespace-nowrap transition ${
+                dragOverTarget === dropKey
+                  ? "bg-jade text-white ring-2 ring-jade ring-offset-1"
+                  : isActive
+                  ? "bg-jade text-white shadow-sm"
+                  : "bg-white/70 text-bark border border-sand hover:border-jade/50"
+              }`}
+            >
+              <Icon size={13} />
+              {st.key}
+              {count > 0 && (
+                <span className={`text-[10px] ${isActive || dragOverTarget === dropKey ? "text-mint" : "text-muted"}`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* List */}
+      <div className="space-y-2 mb-5">
+        {filtered.length === 0 ? (
+          <EmptyState text={`No ${activeSubType.toLowerCase()} in ${activeCategory} yet.`} />
+        ) : (
+          filtered.map((place) => (
+            <PlaceCard
+              key={place.id}
+              place={place}
+              onRemove={remove}
+              onUpdate={update}
+              onDragStart={(_e, p) => setDraggedPlace(p)}
+              onDragEnd={() => {
+                setDraggedPlace(null);
+                setDragOverTarget(null);
+              }}
+              isDragging={draggedPlace?.id === place.id}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Add form */}
+      <div className="bg-white/70 border border-sand rounded-xl p-3 space-y-2">
+        <input
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          placeholder={`Add a ${activeSubType.toLowerCase().replace(/s$/, "")} in ${activeCategory}`}
+          className="w-full rounded-lg border border-sand-deep bg-white px-2.5 py-2 text-[14px] outline-none focus:ring-2 focus:ring-jade/40"
+        />
+        <input
+          value={form.notes}
+          onChange={(e) => setForm({ ...form, notes: e.target.value })}
+          placeholder="Notes (optional)"
+          className="w-full rounded-lg border border-sand-deep bg-white px-2.5 py-2 text-[14px] outline-none focus:ring-2 focus:ring-jade/40"
+        />
+        <div className="flex gap-2">
+          <input
+            value={form.link}
+            onChange={(e) => setForm({ ...form, link: e.target.value })}
+            onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+            placeholder="Link (optional)"
+            className="flex-1 rounded-lg border border-sand-deep bg-white px-2.5 py-2 text-[14px] outline-none focus:ring-2 focus:ring-jade/40"
+          />
+          <button
+            onClick={handleAdd}
+            className="px-3 rounded-lg bg-forest text-white flex items-center justify-center active:scale-95 transition hover:bg-forest/90"
+            aria-label="Add place"
+          >
+            <Plus size={18} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

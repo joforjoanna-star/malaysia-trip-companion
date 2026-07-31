@@ -1,0 +1,146 @@
+/*
+# Malaysia Trip Companion — places, tickets, reminders, documents files
+
+1. Purpose
+   Extend the schema for richer trip planning:
+   - Places gain a region (Kuala Lumpur / Langkawi) and a category
+     (Cafes, Hotels, Parks, Attractions, Malls).
+   - A new "tickets" table for Air, Hotel, and Attraction tickets.
+   - A new "reminders" table for a to-do list of things to do before the trip.
+   - Documents gain file columns so travelers can upload, download, and open
+     scanned copies of their MDAC card, passport, insurance, etc.
+
+2. New Tables
+   - tickets (id, type, title, reference, notes, link, created_at)
+     type: 'air' | 'hotel' | 'attraction'
+   - reminders (id, label, done, due, created_at)
+     A to-do list of pre-trip tasks.
+
+3. Modified Tables
+   - places: add region (text) and category (text) columns.
+   - documents: add file_path (text) and file_name (text) columns for
+     uploaded file storage in Supabase Storage.
+
+4. Storage
+   - A public storage bucket "trip-documents" is created for uploaded files
+     (passport scans, MDAC, insurance, etc.). Files are publicly readable so
+     they can be opened/downloaded directly from the frontend.
+
+5. Security
+   - RLS enabled on tickets and reminders (anon + authenticated CRUD,
+     single-tenant shared data, same pattern as existing tables).
+   - places and documents keep their existing RLS policies; new columns
+     inherit those policies automatically.
+   - Storage bucket is public for reads; writes use the anon key.
+
+6. Seed data
+   - Existing places are tagged with region + category where possible.
+   - tickets are seeded with AirAsia flight, Bukit Bintang hotel.
+   - reminders are seeded with a few starter pre-trip tasks.
+*/
+
+-- places: add region + category ------------------------------------------
+ALTER TABLE places ADD COLUMN IF NOT EXISTS region text NOT NULL DEFAULT 'Kuala Lumpur';
+ALTER TABLE places ADD COLUMN IF NOT EXISTS category text NOT NULL DEFAULT 'Attractions';
+
+-- Tag existing seeded places
+UPDATE places SET region = 'Kuala Lumpur', category = 'Attractions' WHERE name = 'Bukit Bintang' AND category = 'Attractions';
+UPDATE places SET region = 'Kuala Lumpur', category = 'Attractions' WHERE name = 'Batu Caves' AND category = 'Attractions';
+UPDATE places SET region = 'Kuala Lumpur', category = 'Attractions' WHERE name = 'Petronas Towers' AND category = 'Attractions';
+
+-- documents: add file columns --------------------------------------------
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_path text;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_name text;
+
+-- tickets ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tickets (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  type text NOT NULL DEFAULT 'air',
+  title text NOT NULL,
+  reference text NOT NULL DEFAULT '',
+  notes text NOT NULL DEFAULT '',
+  link text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE tickets ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "anon_select_tickets" ON tickets;
+CREATE POLICY "anon_select_tickets" ON tickets FOR SELECT
+  TO anon, authenticated USING (true);
+DROP POLICY IF EXISTS "anon_insert_tickets" ON tickets;
+CREATE POLICY "anon_insert_tickets" ON tickets FOR INSERT
+  TO anon, authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "anon_update_tickets" ON tickets;
+CREATE POLICY "anon_update_tickets" ON tickets FOR UPDATE
+  TO anon, authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "anon_delete_tickets" ON tickets;
+CREATE POLICY "anon_delete_tickets" ON tickets FOR DELETE
+  TO anon, authenticated USING (true);
+
+-- reminders --------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS reminders (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  label text NOT NULL,
+  done boolean NOT NULL DEFAULT false,
+  due text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE reminders ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "anon_select_reminders" ON reminders;
+CREATE POLICY "anon_select_reminders" ON reminders FOR SELECT
+  TO anon, authenticated USING (true);
+DROP POLICY IF EXISTS "anon_insert_reminders" ON reminders;
+CREATE POLICY "anon_insert_reminders" ON reminders FOR INSERT
+  TO anon, authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "anon_update_reminders" ON reminders;
+CREATE POLICY "anon_update_reminders" ON reminders FOR UPDATE
+  TO anon, authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "anon_delete_reminders" ON reminders;
+CREATE POLICY "anon_delete_reminders" ON reminders FOR DELETE
+  TO anon, authenticated USING (true);
+
+-- Seed tickets -----------------------------------------------------------
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM tickets) THEN
+    INSERT INTO tickets (type, title, reference, notes, link) VALUES
+      ('air', 'AirAsia flight booking', '', 'Bangalore -> KL', ''),
+      ('hotel', 'Bukit Bintang hotel booking', '', '', '');
+  END IF;
+END $$;
+
+-- Seed reminders ---------------------------------------------------------
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM reminders) THEN
+    INSERT INTO reminders (label, done, due) VALUES
+      ('Submit MDAC (Malaysia Digital Arrival Card)', false, '3 days before arrival'),
+      ('Print/save boarding pass', false, ''),
+      ('Top up Touch ''n Go card', false, ''),
+      ('Buy travel insurance', false, ''),
+      ('Inform bank about overseas card usage', false, '');
+  END IF;
+END $$;
+
+-- Storage bucket for document uploads ------------------------------------
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('trip-documents', 'trip-documents', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage policies: public read, anon write -------------------------------
+DROP POLICY IF EXISTS "anon_read_trip_documents" ON storage.objects;
+CREATE POLICY "anon_read_trip_documents" ON storage.objects FOR SELECT
+  TO anon, authenticated USING (bucket_id = 'trip-documents');
+
+DROP POLICY IF EXISTS "anon_insert_trip_documents" ON storage.objects;
+CREATE POLICY "anon_insert_trip_documents" ON storage.objects FOR INSERT
+  TO anon, authenticated WITH CHECK (bucket_id = 'trip-documents');
+
+DROP POLICY IF EXISTS "anon_update_trip_documents" ON storage.objects;
+CREATE POLICY "anon_update_trip_documents" ON storage.objects FOR UPDATE
+  TO anon, authenticated USING (bucket_id = 'trip-documents') WITH CHECK (bucket_id = 'trip-documents');
+
+DROP POLICY IF EXISTS "anon_delete_trip_documents" ON storage.objects;
+CREATE POLICY "anon_delete_trip_documents" ON storage.objects FOR DELETE
+  TO anon, authenticated USING (bucket_id = 'trip-documents');

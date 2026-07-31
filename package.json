@@ -1,0 +1,23 @@
+/*
+# Places: three categories (Kuala Lumpur, Langkawi, Others)
+
+1. Changes
+   - places.category now holds one of: "Kuala Lumpur", "Langkawi", "Others".
+   - Existing places updated: category set from their region value.
+   - places.category default changed to "Kuala Lumpur".
+   - places.region column retained (data safety: never drop columns)
+     but the app now uses only the category column.
+
+2. Security
+   - No RLS changes. Existing policies remain.
+
+3. Notes
+   - The old category values (Cafes/Hotels/Parks/Attractions/Malls) are
+     replaced by the new three-category system.
+*/
+
+UPDATE places SET category = 'Kuala Lumpur' WHERE region = 'Kuala Lumpur';
+UPDATE places SET category = 'Langkawi' WHERE region = 'Langkawi';
+UPDATE places SET category = 'Others' WHERE region NOT IN ('Kuala Lumpur', 'Langkawi');
+
+ALTER TABLE places ALTER COLUMN category SET DEFAULT 'Kuala Lumpur';
