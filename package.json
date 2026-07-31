@@ -1,23 +1,27 @@
-/*
-# Places: three categories (Kuala Lumpur, Langkawi, Others)
-
-1. Changes
-   - places.category now holds one of: "Kuala Lumpur", "Langkawi", "Others".
-   - Existing places updated: category set from their region value.
-   - places.category default changed to "Kuala Lumpur".
-   - places.region column retained (data safety: never drop columns)
-     but the app now uses only the category column.
-
-2. Security
-   - No RLS changes. Existing policies remain.
-
-3. Notes
-   - The old category values (Cafes/Hotels/Parks/Attractions/Malls) are
-     replaced by the new three-category system.
-*/
-
-UPDATE places SET category = 'Kuala Lumpur' WHERE region = 'Kuala Lumpur';
-UPDATE places SET category = 'Langkawi' WHERE region = 'Langkawi';
-UPDATE places SET category = 'Others' WHERE region NOT IN ('Kuala Lumpur', 'Langkawi');
-
-ALTER TABLE places ALTER COLUMN category SET DEFAULT 'Kuala Lumpur';
+{
+  "name": "malaysia-trip-companion",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2",
+    "lucide-react": "^0.441.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.45",
+    "tailwindcss": "^3.4.10",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.3"
+  }
+}
